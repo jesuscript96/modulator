@@ -1,0 +1,6 @@
+{"sessionId":"61ee0c","location":"TimelineView.tsx:init-start","message":"Starting PixiJS init (guarded)","data":{"width":1511,"height":757},"timestamp":1772340001370,"hypothesisId":"H6","runId":"post-fix-2"}
+{"sessionId":"61ee0c","location":"TimelineView.tsx:init-success","message":"PixiJS init succeeded (guarded)","data":{},"timestamp":1772340001428,"hypothesisId":"H6","runId":"post-fix-2"}
+{"sessionId":"61ee0c","location":"TimelineView.tsx:init-start","message":"Starting PixiJS init (guarded)","data":{"width":1511,"height":757},"timestamp":1772340148189,"hypothesisId":"H6","runId":"post-fix-2"}
+{"sessionId":"61ee0c","location":"TimelineView.tsx:init-success","message":"PixiJS init succeeded (guarded)","data":{},"timestamp":1772340148259,"hypothesisId":"H6","runId":"post-fix-2"}
+{"sessionId":"61ee0c","location":"TimelineView.tsx:init-start","message":"Starting PixiJS init (guarded)","data":{"width":1511,"height":757},"timestamp":1772340379950,"hypothesisId":"H6","runId":"post-fix-2"}
+{"sessionId":"61ee0c","location":"TimelineView.tsx:init-success","message":"PixiJS init succeeded (guarded)","data":{},"timestamp":1772340380180,"hypothesisId":"H6","runId":"post-fix-2"}
