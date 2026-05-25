@@ -86,4 +86,5 @@ export interface LabClip {
   duration: number;
   sampleRate: number;
   createdAt: number;
+  vectors?: SoundVector[];
 }

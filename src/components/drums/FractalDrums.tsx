@@ -9,9 +9,10 @@ import helpContent from '../../data/helpContent';
 interface FractalDrumsProps {
   sequencer: FractalSequencer;
   onModeChange: (mode: RhythmMode) => void;
+  onPatternChange?: () => void;
 }
 
-export default function FractalDrums({ sequencer, onModeChange }: FractalDrumsProps) {
+export default function FractalDrums({ sequencer, onModeChange, onPatternChange }: FractalDrumsProps) {
   const [mode, setMode] = useState<RhythmMode>('euclidean');
   const [preset, setPreset] = useState<LSystemPreset>('algae');
   const [iterations, setIterations] = useState(4);
@@ -24,8 +25,9 @@ export default function FractalDrums({ sequencer, onModeChange }: FractalDrumsPr
       sequencer.setMode(m);
       onModeChange(m);
       setFractalDim(sequencer.fractalDimension);
+      onPatternChange?.();
     },
-    [sequencer, onModeChange]
+    [sequencer, onModeChange, onPatternChange]
   );
 
   const handlePresetChange = useCallback(
@@ -33,8 +35,9 @@ export default function FractalDrums({ sequencer, onModeChange }: FractalDrumsPr
       setPreset(p);
       sequencer.setLSystemPreset(p, iterations);
       setFractalDim(sequencer.fractalDimension);
+      onPatternChange?.();
     },
-    [sequencer, iterations]
+    [sequencer, iterations, onPatternChange]
   );
 
   const handleIterationsChange = useCallback(
@@ -42,9 +45,17 @@ export default function FractalDrums({ sequencer, onModeChange }: FractalDrumsPr
       setIterations(n);
       sequencer.setIterations(n);
       setFractalDim(sequencer.fractalDimension);
+      onPatternChange?.();
     },
-    [sequencer]
+    [sequencer, onPatternChange]
   );
+
+  // Trigger onPatternChange when mandelbrotCy changes (since it recalculates Mandelbrot patterns)
+  useEffect(() => {
+    if (mode === 'mandelbrot') {
+      onPatternChange?.();
+    }
+  }, [mandelbrotCy, mode, onPatternChange]);
 
   return (
     <div className="flex flex-col gap-3">

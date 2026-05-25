@@ -10,6 +10,7 @@ interface ProjectState {
   isPlaying: boolean;
   currentStep: number;
   transform: AffineMatrix | null;
+  boardPlaybackMode: 'both' | 'synth' | 'audio';
 
   addClip: (clip: Clip) => void;
   removeClip: (id: string) => void;
@@ -23,6 +24,7 @@ interface ProjectState {
   setPlaying: (playing: boolean) => void;
   setCurrentStep: (step: number) => void;
   setTransform: (transform: AffineMatrix | null) => void;
+  setBoardPlaybackMode: (mode: 'both' | 'synth' | 'audio') => void;
 }
 
 function nextAvailableLane(clips: Clip[]): number {
@@ -49,6 +51,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   isPlaying: false,
   currentStep: 0,
   transform: null,
+  boardPlaybackMode: 'both',
 
   addClip: (clip) =>
     set((state) => ({ clips: [...state.clips, clip] })),
@@ -85,10 +88,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const targetStart = startTime ?? nextStartTime(state.clips, targetLane);
 
     const boardClip: Clip = {
-      id: `board-${labClip.id}-${Date.now()}`,
+      id: `board-${labClip.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       name: labClip.name,
       audioBuffer: labClip.audioBuffer,
-      vectors: [],
+      vectors: labClip.vectors ?? [],
       lane: targetLane,
       startTime: targetStart,
       duration: durationBeats,
@@ -102,4 +105,5 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setPlaying: (playing) => set({ isPlaying: playing }),
   setCurrentStep: (step) => set({ currentStep: step }),
   setTransform: (transform) => set({ transform }),
+  setBoardPlaybackMode: (boardPlaybackMode) => set({ boardPlaybackMode }),
 }));

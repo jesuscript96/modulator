@@ -1,9 +1,14 @@
 import BoardView from '../components/board/BoardView';
+import type { BoardAudioEngine } from '../engine/BoardAudioEngine';
 
-export default function BoardPage() {
+interface BoardPageProps {
+  boardEngine: BoardAudioEngine;
+}
+
+export default function BoardPage({ boardEngine }: BoardPageProps) {
   return (
     <div className="flex-grow flex flex-col min-h-0 h-full">
-      <BoardView />
+      <BoardView boardEngine={boardEngine} />
     </div>
   );
 }

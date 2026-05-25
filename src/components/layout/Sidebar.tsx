@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { FlaskConical, LayoutGrid, Library, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FlaskConical, LayoutGrid, Library, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useProjectStore } from '../../stores/useProjectStore';
 
 interface SidebarProps {
@@ -9,6 +9,7 @@ interface SidebarProps {
 
 const navItems = [
   { to: '/lab', icon: FlaskConical, label: 'Lab' },
+  { to: '/composer', icon: Sparkles, label: 'Composer' },
   { to: '/board', icon: LayoutGrid, label: 'Board' },
   { to: '/library', icon: Library, label: 'Library' },
 ];

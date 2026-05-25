@@ -60,8 +60,27 @@ export class TimelineCanvas {
   private _clips: Clip[] = [];
   private _playheadTime = 0;
   private _selectedClipId: string | null = null;
+  private _bpm = 120;
 
   onClipSelect?: (clipId: string | null) => void;
+  onClipMove?: (clipId: string, newStartTime: number, newLane: number, deltaSemitones: number) => void;
+  onSeek?: (beat: number) => void;
+
+  setBpm(bpm: number) {
+    this._bpm = bpm;
+    this.drawGrid();
+    this.renderClips();
+  }
+
+  private draggingClip: {
+    id: string;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    startTime: number;
+    lane: number;
+  } | null = null;
 
   async init(canvas: HTMLCanvasElement) {
     this.app = new Application();
@@ -213,58 +232,120 @@ export class TimelineCanvas {
     this.clipContainer.removeChildren();
 
     for (const clip of this._clips) {
-      if (clip.vectors.length === 0) {
-        this.renderClipBlock(clip);
-      } else {
-        for (const v of clip.vectors) {
-          this.renderVector(v, clip.id === this._selectedClipId);
+      const isDraggingThis = this.draggingClip && this.draggingClip.id === clip.id;
+      if (isDraggingThis) {
+        const dx = this.draggingClip!.currentX - this.draggingClip!.startX;
+        const dy = this.draggingClip!.currentY - this.draggingClip!.startY;
+
+        const deltaBeats = dx / (this.pixelsPerBeat * this.zoom.x);
+        const snapGrid = 0.25;
+        const targetBeats = Math.round(deltaBeats / snapGrid) * snapGrid;
+
+        if (clip.vectors.length > 0) {
+          const deltaSemitones = Math.round(-dy / (this.pixelsPerNote * this.zoom.y));
+          this.renderClip(clip, { beats: targetBeats, semitones: deltaSemitones, lanes: 0 });
+        } else {
+          const deltaLanes = Math.round(dy / (8 * this.pixelsPerNote * this.zoom.y));
+          this.renderClip(clip, { beats: targetBeats, semitones: 0, lanes: deltaLanes });
         }
+      } else {
+        this.renderClip(clip);
       }
     }
   }
 
-  private renderClipBlock(clip: Clip) {
-    const g = new Graphics();
-    const x = this.toScreenX(clip.startTime);
-    const y = this.toScreenY(60 + clip.lane * 8);
-    const w = Math.max(this.beatWidth(clip.duration), 4);
-    const h = 8 * this.pixelsPerNote * this.zoom.y;
-    const selected = clip.id === this._selectedClipId;
+  private renderClip(
+    clip: Clip,
+    dragOffsets?: { beats: number; semitones: number; lanes: number }
+  ) {
+    const startTime = Math.max(0, clip.startTime + (dragOffsets?.beats ?? 0));
+    const lane = Math.max(0, clip.lane + (dragOffsets?.lanes ?? 0));
+    const semitones = dragOffsets?.semitones ?? 0;
 
+    const selected = clip.id === this._selectedClipId;
+    const hasVectors = clip.vectors.length > 0;
+
+    let x = this.toScreenX(startTime);
+    let y = 0;
+    let w = Math.max(this.beatWidth(clip.duration), 4);
+    let h = 0;
+    let boxColor = 0x888888;
+
+    if (hasVectors) {
+      const pitches = clip.vectors.map((v) => v.p + semitones);
+      const minP = Math.min(...pitches);
+      const maxP = Math.max(...pitches);
+      const topPitch = Math.min(127, maxP + 2);
+      const bottomPitch = Math.max(0, minP - 2);
+
+      y = this.toScreenY(topPitch);
+      h = (topPitch - bottomPitch + 1) * this.pixelsPerNote * this.zoom.y;
+      boxColor = colorForPitch(maxP);
+    } else {
+      y = this.toScreenY(60 + lane * 8);
+      h = 8 * this.pixelsPerNote * this.zoom.y;
+      boxColor = colorForPitch(60 + lane * 8);
+    }
+
+    const g = new Graphics();
     g.rect(x, y, w, h);
-    g.fill({ color: colorForPitch(60 + clip.lane * 8), alpha: 0.15 });
-    g.stroke({ color: selected ? FG_COLOR : colorForPitch(60 + clip.lane * 8), width: selected ? 2 : 1 });
+    g.fill({ color: boxColor, alpha: selected ? 0.08 : 0.04 });
+    g.stroke({
+      color: selected ? FG_COLOR : boxColor,
+      width: selected ? 2 : 0.8,
+      alpha: selected ? 1.0 : 0.4,
+    });
 
     const nameStyle = new TextStyle({
       fontFamily: 'monospace',
       fontSize: 9,
       fill: FG_COLOR,
+      fontWeight: selected ? 'bold' : 'normal',
     });
     const label = new Text({ text: clip.name, style: nameStyle });
-    label.x = x + 3;
+    label.x = x + 4;
     label.y = y + 2;
+
     this.clipContainer.addChild(g);
     this.clipContainer.addChild(label);
 
+    if (hasVectors) {
+      for (const v of clip.vectors) {
+        const vx = this.toScreenX(startTime + (v.t / 1000) * (this._bpm / 60));
+        const vy = this.toScreenY(v.p + semitones);
+        const vw = Math.max(this.beatWidth((v.duration / 1000) * (this._bpm / 60)), 2);
+        const vh = this.pixelsPerNote * this.zoom.y;
+
+        const vg = new Graphics();
+        vg.rect(vx, vy, vw, vh);
+        vg.fill({ color: colorForPitch(v.p + semitones), alpha: v.velocity * 0.75 });
+        vg.stroke({
+          color: selected ? FG_COLOR : colorForPitch(v.p + semitones),
+          width: selected ? 1 : 0.4,
+          alpha: selected ? 0.8 : 0.4,
+        });
+        this.clipContainer.addChild(vg);
+      }
+    }
+
     g.eventMode = 'static';
-    g.cursor = 'pointer';
-    g.on('pointertap', () => {
-      this.onClipSelect?.(clip.id);
+    g.cursor = 'move';
+    g.on('pointerdown', (e) => {
+      if (e.button === 0 && !e.altKey) {
+        e.stopPropagation();
+        this.onClipSelect?.(clip.id);
+        this.draggingClip = {
+          id: clip.id,
+          startX: e.clientX,
+          startY: e.clientY,
+          currentX: e.clientX,
+          currentY: e.clientY,
+          startTime: clip.startTime,
+          lane: clip.lane,
+        };
+        this.renderClips();
+      }
     });
-  }
-
-  private renderVector(v: SoundVector, selected: boolean) {
-    const g = new Graphics();
-    const x = this.toScreenX(v.t / 1000 * (120 / 60));
-    const y = this.toScreenY(v.p);
-    const w = Math.max(this.beatWidth(v.duration / 1000 * (120 / 60)), 2);
-    const h = this.pixelsPerNote * this.zoom.y;
-
-    g.rect(x, y, w, h);
-    g.fill({ color: colorForPitch(v.p), alpha: v.velocity * 0.6 });
-    g.stroke({ color: selected ? FG_COLOR : colorForPitch(v.p), width: selected ? 1.5 : 0.5 });
-
-    this.clipContainer.addChild(g);
   }
 
   private drawPlayhead() {
@@ -319,10 +400,26 @@ export class TimelineCanvas {
         dragging = true;
         lastPos = { x: e.clientX, y: e.clientY };
         canvas.style.cursor = 'grabbing';
+      } else if (e.button === 0) {
+        // Left click on background -> Seek
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const beat = (clickX - this.pan.x) / (this.pixelsPerBeat * this.zoom.x);
+        
+        // Snap to 16th note (0.25 beat)
+        const snappedBeat = Math.max(0, Math.round(beat * 4) / 4);
+        
+        this.onSeek?.(snappedBeat);
       }
     });
 
     canvas.addEventListener('pointermove', (e) => {
+      if (this.draggingClip) {
+        this.draggingClip.currentX = e.clientX;
+        this.draggingClip.currentY = e.clientY;
+        this.renderClips();
+        return;
+      }
       if (!dragging) return;
       this.pan.x += e.clientX - lastPos.x;
       this.pan.y += e.clientY - lastPos.y;
@@ -333,9 +430,38 @@ export class TimelineCanvas {
     });
 
     const endDrag = () => {
+      if (this.draggingClip) {
+        const dx = this.draggingClip.currentX - this.draggingClip.startX;
+        const dy = this.draggingClip.currentY - this.draggingClip.startY;
+
+        const deltaBeats = dx / (this.pixelsPerBeat * this.zoom.x);
+        const snapGrid = 0.25;
+        const targetBeats = Math.max(0, Math.round((this.draggingClip.startTime + deltaBeats) / snapGrid) * snapGrid);
+
+        const clip = this._clips.find((c) => c.id === this.draggingClip!.id);
+        let targetLane = this.draggingClip.lane;
+        let deltaSemitones = 0;
+
+        if (clip) {
+          if (clip.vectors.length > 0) {
+            deltaSemitones = Math.round(-dy / (this.pixelsPerNote * this.zoom.y));
+          } else {
+            const deltaLanes = Math.round(dy / (8 * this.pixelsPerNote * this.zoom.y));
+            targetLane = Math.max(0, this.draggingClip.lane + deltaLanes);
+          }
+        }
+
+        const dragClipId = this.draggingClip.id;
+        this.draggingClip = null;
+
+        this.onClipMove?.(dragClipId, targetBeats, targetLane, deltaSemitones);
+        this.renderClips();
+        return;
+      }
       dragging = false;
       canvas.style.cursor = 'default';
     };
+
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointerleave', endDrag);
   }

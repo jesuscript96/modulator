@@ -135,4 +135,21 @@ export class FractalSequencer {
     }
     return RhythmPresets[this.lsystemPreset].generate(this.iterations);
   }
+
+  getPatterns16(): Record<DrumTrack, boolean[]> {
+    const patterns: Record<DrumTrack, boolean[]> = {
+      kick: new Array(16).fill(false),
+      snare: new Array(16).fill(false),
+      hihat: new Array(16).fill(false),
+      perc: new Array(16).fill(false),
+    };
+
+    for (let step = 0; step < 16; step++) {
+      const hits = this.getPatternForStep(step);
+      for (const hit of hits) {
+        patterns[hit.instrument][step] = true;
+      }
+    }
+    return patterns;
+  }
 }

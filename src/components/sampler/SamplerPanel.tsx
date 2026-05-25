@@ -39,7 +39,7 @@ export default function SamplerPanel() {
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
-    const droppedFiles = Array.from(e.dataTransfer.files).filter((f) =>
+    const droppedFiles = (Array.from(e.dataTransfer.files) as File[]).filter((f) =>
       f.type.startsWith('audio/')
     );
 

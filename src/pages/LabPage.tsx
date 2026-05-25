@@ -8,6 +8,9 @@ import LabClipsTray from '../components/lab/LabClipsTray';
 import HelpTooltip from '../components/shared/HelpTooltip';
 import helpContent from '../data/helpContent';
 import { useProjectStore } from '../stores/useProjectStore';
+import type { SoundVector, RhythmMode } from '../types';
+import FractalDrums from '../components/drums/FractalDrums';
+import DidacticLabGuide from '../components/lab/DidacticLabGuide';
 
 export default function LabPage() {
   const [engine, setEngine] = useState<AudioEngine | null>(null);
@@ -37,6 +40,12 @@ export default function LabPage() {
   const [selectedPreset, setSelectedPreset] = useState('custom');
   const [isRenderingDrums, setIsRenderingDrums] = useState(false);
 
+  const [drumMode, setDrumMode] = useState<RhythmMode>('euclidean');
+  const [seqTrigger, setSeqTrigger] = useState(0);
+  const [stretchMode, setStretchMode] = useState<'none' | 'constant' | 'padovan' | 'primes' | 'paulstretch'>('none');
+  const [stretchFactor, setStretchFactor] = useState(4);
+  const [isStretching, setIsStretching] = useState(false);
+
   const DRUM_PRESETS: Record<string, { label: string; kick: number; snare: number; hihat: number; perc: number } | null> = useMemo(() => ({
     custom: null,
     padovan: { label: 'Padovan', kick: 3, snare: 4, hihat: 7, perc: 9 },
@@ -52,6 +61,11 @@ export default function LabPage() {
     hihat: applyMuteRule(euclidean(euclideanParams.hihat.k, euclideanParams.hihat.n), muteRules.hihat),
     perc: applyMuteRule(euclidean(euclideanParams.perc.k, euclideanParams.perc.n), muteRules.perc),
   }), [euclideanParams, muteRules]);
+
+  const activePatterns = useMemo(() => {
+    if (!engine || drumMode === 'euclidean') return finalPatterns;
+    return engine.sequencer.getPatterns16();
+  }, [engine, drumMode, finalPatterns, seqTrigger]);
 
   useEffect(() => {
     const newEngine = new AudioEngine();
@@ -81,17 +95,31 @@ export default function LabPage() {
 
   useEffect(() => {
     if (!engine) return;
-    engine.setPattern('kick', finalPatterns.kick);
-    engine.setPattern('snare', finalPatterns.snare);
-    engine.setPattern('hihat', finalPatterns.hihat);
-    engine.setPattern('perc', finalPatterns.perc);
-  }, [finalPatterns, engine]);
+    if (drumMode === 'euclidean') {
+      engine.setPattern('kick', finalPatterns.kick);
+      engine.setPattern('snare', finalPatterns.snare);
+      engine.setPattern('hihat', finalPatterns.hihat);
+      engine.setPattern('perc', finalPatterns.perc);
+    }
+  }, [finalPatterns, drumMode, engine]);
 
   const handlePlay = async () => {
     if (!engine) return;
     const playing = await engine.togglePlayback();
     setIsPlaying(playing);
   };
+
+  const handleStretchChange = useCallback(async (mode: any, factor: number) => {
+    setStretchMode(mode);
+    setStretchFactor(factor);
+    if (!engine) return;
+    setIsStretching(true);
+    try {
+      await engine.applyStretch(mode, factor);
+    } finally {
+      setIsStretching(false);
+    }
+  }, [engine]);
 
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -104,6 +132,7 @@ export default function LabPage() {
         await engine.loadSample(url);
         setHasSample(true);
         setFileName(file.name.replace(/\.[^/.]+$/, ''));
+        setStretchMode('none');
 
         const arrayBuffer = await file.arrayBuffer();
         const audioContext = new AudioContext();
@@ -142,7 +171,12 @@ export default function LabPage() {
   }, [audioBuffer, fileName, addLabClip]);
 
   const handleHPSSeparated = useCallback(
-    (harmonic: AudioBuffer, percussive: AudioBuffer, _melodyFreqs: number[]) => {
+    (
+      harmonic: AudioBuffer,
+      percussive: AudioBuffer,
+      _melodyFreqs: number[],
+      melodyVectors: SoundVector[]
+    ) => {
       const ts = Date.now();
       const base = fileName || 'sample';
       addLabClip({
@@ -153,6 +187,7 @@ export default function LabPage() {
         duration: harmonic.duration,
         sampleRate: harmonic.sampleRate,
         createdAt: ts,
+        vectors: melodyVectors,
       });
       addLabClip({
         id: `lab-percussive-${ts}`,
@@ -181,16 +216,20 @@ export default function LabPage() {
 
   const handleSaveDrums = useCallback(async () => {
     if (!engine) return;
-    const hasAnyHits = ([finalPatterns.kick, finalPatterns.snare, finalPatterns.hihat, finalPatterns.perc] as boolean[][]).some(p => p.some(Boolean));
+    const hasAnyHits = ([activePatterns.kick, activePatterns.snare, activePatterns.hihat, activePatterns.perc] as boolean[][]).some(p => p.some(Boolean));
     if (!hasAnyHits) return;
     setIsRenderingDrums(true);
     try {
       const buffer = await engine.renderDrumPattern(2);
-      const presetLabel = DRUM_PRESETS[selectedPreset]?.label ?? 'Custom';
-      const rulesUsed = Object.entries(muteRules)
-        .filter(([, r]) => r !== 'none')
-        .map(([t, r]) => `${t}:${r}`)
-        .join(' ');
+      const presetLabel = drumMode === 'euclidean' 
+        ? (DRUM_PRESETS[selectedPreset]?.label ?? 'Custom')
+        : `${drumMode.toUpperCase()} Fractal`;
+      const rulesUsed = drumMode === 'euclidean' 
+        ? Object.entries(muteRules)
+            .filter(([, r]) => r !== 'none')
+            .map(([t, r]) => `${t}:${r}`)
+            .join(' ')
+        : '';
       const nameParts = [`Drums [${presetLabel}]`];
       if (rulesUsed) nameParts.push(`(${rulesUsed})`);
       addLabClip({
@@ -205,7 +244,7 @@ export default function LabPage() {
     } finally {
       setIsRenderingDrums(false);
     }
-  }, [engine, finalPatterns, selectedPreset, muteRules, DRUM_PRESETS, addLabClip]);
+  }, [engine, activePatterns, drumMode, selectedPreset, muteRules, DRUM_PRESETS, addLabClip]);
 
   return (
     <div className="p-4 md:p-8 flex flex-col flex-grow">
@@ -302,48 +341,95 @@ export default function LabPage() {
           {/* Math Controls */}
           <div className="border-t border-black pt-4">
             <h4 className="font-bold text-sm uppercase mb-4 flex items-center gap-2">
-              Algorithmic Modulators
+              Moduladores Matemáticos
             </h4>
             <div className="flex flex-col gap-4 text-sm">
-              <label className="flex flex-col gap-2">
-                <span className="uppercase tracking-widest text-xs flex items-center gap-1.5">
-                  Rule
+              <label className="flex flex-col gap-1.5">
+                <span className="uppercase tracking-widest text-xs flex items-center gap-1.5 font-bold">
+                  Regla de Control
                   <HelpTooltip
-                    title="Math Rules"
+                    title="Reglas Matemáticas"
                     technical="Cada regla aplica una secuencia matemática distinta a los parámetros del sampler granular en cada step del secuenciador (16n)."
                     beginner="Elige qué fórmula matemática controla el sonido. Cada una produce un efecto diferente: Fibonacci lo hace orgánico, Golden Ratio lo hace armónico, Noise lo hace caótico."
                   />
                 </span>
+                <span className="text-[9px] text-black/40 leading-tight">La fórmula moverá las perillas de sonido en cada tiempo.</span>
                 <select
-                  className="bg-transparent border border-black px-2 py-1 outline-none font-mono text-xs"
+                  className="bg-transparent border border-black px-2 py-1 outline-none font-mono text-xs cursor-pointer mt-0.5"
                   value={mathRule}
                   onChange={(e) => setMathRule(e.target.value as any)}
                 >
-                  <option value="none">None</option>
-                  <option value="fibonacci">Fibonacci (Time/Grain)</option>
-                  <option value="golden">Golden Ratio (Filter)</option>
-                  <option value="noise">Simplex Noise (Chaos)</option>
+                  <option value="none">Ninguna (Sonido Estático)</option>
+                  <option value="fibonacci">Fibonacci (Textura Orgánica)</option>
+                  <option value="golden">Proporción Áurea (Apertura de Filtro)</option>
+                  <option value="noise">Ruido Simplex (Caos Natural)</option>
                 </select>
               </label>
-              <label className="flex flex-col gap-2">
-                <span className="uppercase tracking-widest text-xs flex justify-between">
+              <label className="flex flex-col gap-1.5">
+                <span className="uppercase tracking-widest text-xs flex justify-between font-bold">
                   <span className="flex items-center gap-1.5">
-                    Complexity
+                    Complejidad del Ciclo
                     <HelpTooltip {...helpContent.complexity} />
                   </span>
                   <span>{complexity}</span>
                 </span>
+                <span className="text-[9px] text-black/40 leading-tight">Determina qué tan largo es el recorrido matemático antes de repetirse.</span>
                 <input
                   type="range"
                   min="1"
                   max="20"
                   value={complexity}
                   onChange={(e) => setComplexity(parseInt(e.target.value))}
-                  className="accent-black"
+                  className="accent-black mt-1"
                 />
               </label>
             </div>
           </div>
+
+          {/* Time Stretching Controls */}
+          {hasSample && (
+            <div className="border-t border-black pt-4">
+              <h4 className="font-bold text-xs uppercase mb-3 flex items-center gap-2">
+                Spectral Time Stretch
+                {isStretching && <Loader2 className="w-3.5 h-3.5 animate-spin ml-auto" />}
+              </h4>
+              <div className="flex flex-col gap-3 text-xs">
+                <label className="flex flex-col gap-1.5">
+                  <span className="uppercase tracking-widest text-[10px] text-black/50">Vocoder Mode</span>
+                  <select
+                    className="bg-transparent border border-black/20 px-2 py-1 outline-none font-mono text-xs cursor-pointer"
+                    value={stretchMode}
+                    onChange={(e) => handleStretchChange(e.target.value as any, stretchFactor)}
+                    disabled={isStretching}
+                  >
+                    <option value="none">None (1x speed)</option>
+                    <option value="constant">Constant Vocoder</option>
+                    <option value="paulstretch">Paulstretch (Ambient)</option>
+                    <option value="padovan">Padovan Series Stretch</option>
+                    <option value="primes">Prime Series Stretch</option>
+                  </select>
+                </label>
+                {stretchMode !== 'none' && (
+                  <label className="flex flex-col gap-1">
+                    <span className="uppercase tracking-widest text-[10px] text-black/50 flex justify-between">
+                      <span>Stretch Factor</span>
+                      <span className="font-mono">{stretchFactor}x</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="2"
+                      max="16"
+                      step="1"
+                      value={stretchFactor}
+                      onChange={(e) => handleStretchChange(stretchMode, parseInt(e.target.value))}
+                      disabled={isStretching}
+                      className="accent-black"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Live Params */}
           <div className="border-t border-black pt-4 text-xs font-mono flex flex-col gap-1">
@@ -392,7 +478,7 @@ export default function LabPage() {
           </span>
           <CircularSequencer
             step={step}
-            patterns={finalPatterns}
+            patterns={activePatterns}
           />
           <button
             onClick={handlePlay}
@@ -403,83 +489,101 @@ export default function LabPage() {
           </button>
         </div>
 
-        {/* Right: Euclidean Controls */}
+        {/* Right: Drum Controls (Fractal + Euclidean) */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          <h4 className="font-bold text-sm uppercase border-b border-black pb-2 flex items-center gap-2">
-            Euclidean Geometry (k/n)
-            <HelpTooltip {...helpContent.euclideanRhythm} />
-          </h4>
+          {engine && (
+            <FractalDrums
+              sequencer={engine.sequencer}
+              onModeChange={setDrumMode}
+              onPatternChange={() => setSeqTrigger((t) => t + 1)}
+            />
+          )}
 
-          {/* Preset selector */}
-          <div className="flex flex-col gap-1">
-            <span className="uppercase tracking-widest text-[10px] text-black/60">Preset</span>
-            <select
-              className="bg-transparent border border-black px-2 py-1.5 outline-none font-mono text-xs"
-              value={selectedPreset}
-              onChange={(e) => handlePresetChange(e.target.value)}
-            >
-              <option value="custom">Custom</option>
-              <option value="padovan">Padovan (3, 4, 7, 9)</option>
-              <option value="primos-a">Primos A (2, 3, 5, 11)</option>
-              <option value="primos-b">Primos B (3, 5, 11, 13)</option>
-              <option value="fibonacci">Fibonacci (3, 5, 8, 13)</option>
-              <option value="powers-2">Potencias de 2 (2, 4, 8, 16)</option>
-            </select>
-          </div>
+          {drumMode === 'euclidean' ? (
+            <div className="flex flex-col gap-4 mt-2">
+              <h4 className="font-bold text-xs uppercase border-b border-black/20 pb-2 flex items-center gap-2">
+                Euclidean Settings (k/n)
+                <HelpTooltip {...helpContent.euclideanRhythm} />
+              </h4>
 
-          {(['kick', 'snare', 'hihat', 'perc'] as const).map((track) => {
-            const activeHits = finalPatterns[track].filter(Boolean).length;
-            const baseHits = euclideanParams[track].k;
-            const muted = baseHits - activeHits;
-            return (
-              <div key={track} className="flex flex-col gap-2 text-sm border-b border-black/20 pb-4">
-                <div className="flex justify-between uppercase tracking-widest text-xs">
-                  <span>{track}</span>
-                  <span className="font-mono">
-                    {euclideanParams[track].k}/16
-                    {muted > 0 && (
-                      <span className="text-black/40 ml-1">(-{muted})</span>
-                    )}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="16"
-                  value={euclideanParams[track].k}
-                  onChange={(e) => {
-                    setSelectedPreset('custom');
-                    setEuclideanParams((p) => ({
-                      ...p,
-                      [track]: { ...p[track], k: parseInt(e.target.value) },
-                    }));
-                  }}
-                  className="accent-black w-full"
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-widest text-black/50 shrink-0">Mute</span>
-                  <select
-                    className="bg-transparent border border-black/30 px-1.5 py-0.5 outline-none font-mono text-[10px] flex-1"
-                    value={muteRules[track]}
-                    onChange={(e) =>
-                      setMuteRules((prev) => ({ ...prev, [track]: e.target.value as MuteRule }))
-                    }
-                  >
-                    <option value="none">None</option>
-                    <option value="golden">φ Golden Ratio</option>
-                    <option value="fibonacci">Fibonacci</option>
-                    <option value="goldenNoise">Golden Noise</option>
-                  </select>
-                </div>
+              {/* Preset selector */}
+              <div className="flex flex-col gap-1">
+                <span className="uppercase tracking-widest text-[10px] text-black/60">Preset</span>
+                <select
+                  className="bg-transparent border border-black px-2 py-1.5 outline-none font-mono text-xs cursor-pointer"
+                  value={selectedPreset}
+                  onChange={(e) => handlePresetChange(e.target.value)}
+                >
+                  <option value="custom">Custom</option>
+                  <option value="padovan">Padovan (3, 4, 7, 9)</option>
+                  <option value="primos-a">Primos A (2, 3, 5, 11)</option>
+                  <option value="primos-b">Primos B (3, 5, 11, 13)</option>
+                  <option value="fibonacci">Fibonacci (3, 5, 8, 13)</option>
+                  <option value="powers-2">Potencias de 2 (2, 4, 8, 16)</option>
+                </select>
               </div>
-            );
-          })}
+
+              {(['kick', 'snare', 'hihat', 'perc'] as const).map((track) => {
+                const activeHits = finalPatterns[track].filter(Boolean).length;
+                const baseHits = euclideanParams[track].k;
+                const muted = baseHits - activeHits;
+                return (
+                  <div key={track} className="flex flex-col gap-2 text-sm border-b border-black/10 pb-3">
+                    <div className="flex justify-between uppercase tracking-widest text-[10px]">
+                      <span>{track}</span>
+                      <span className="font-mono">
+                        {euclideanParams[track].k}/16
+                        {muted > 0 && (
+                          <span className="text-black/40 ml-1">(-{muted})</span>
+                        )}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="16"
+                      value={euclideanParams[track].k}
+                      onChange={(e) => {
+                        setSelectedPreset('custom');
+                        setEuclideanParams((p) => ({
+                          ...p,
+                          [track]: { ...p[track], k: parseInt(e.target.value) },
+                        }));
+                      }}
+                      className="accent-black w-full"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] uppercase tracking-widest text-black/50 shrink-0">Mute</span>
+                      <select
+                        className="bg-transparent border border-black/25 px-1 py-0.5 outline-none font-mono text-[9px] flex-1 cursor-pointer"
+                        value={muteRules[track]}
+                        onChange={(e) =>
+                          setMuteRules((prev) => ({ ...prev, [track]: e.target.value as MuteRule }))
+                        }
+                      >
+                        <option value="none">None</option>
+                        <option value="golden">φ Golden Ratio</option>
+                        <option value="fibonacci">Fibonacci</option>
+                        <option value="goldenNoise">Golden Noise</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-xs font-mono text-black/40 bg-black/[0.01] p-3 border border-black/10 rounded mt-2">
+              <span className="font-bold text-black/70 uppercase text-[10px] block mb-1">Active Sequencer</span>
+              {drumMode === 'lsystem' && 'The drum pattern is generated recursively using Lindenmayer Parallel Grammars. Modify the depth or rule preset above to mutate the branch.'}
+              {drumMode === 'mandelbrot' && 'The drum pattern is computed by evaluating the orbits of z²+c in the complex plane. Click on the explorer canvas above to shift the scan lines (cy) and discover new rhythms.'}
+            </div>
+          )}
 
           {/* Save drums */}
           <button
             onClick={handleSaveDrums}
-            disabled={isRenderingDrums || !([finalPatterns.kick, finalPatterns.snare, finalPatterns.hihat, finalPatterns.perc] as boolean[][]).some(p => p.some(Boolean))}
-            className="border border-black px-4 py-2 text-[10px] uppercase tracking-widest hover:bg-black hover:text-[#f4f4f0] transition-colors flex items-center justify-center gap-2 disabled:opacity-30 disabled:pointer-events-none"
+            disabled={isRenderingDrums || !([activePatterns.kick, activePatterns.snare, activePatterns.hihat, activePatterns.perc] as boolean[][]).some(p => p.some(Boolean))}
+            className="border border-black px-4 py-2 text-[10px] uppercase tracking-widest hover:bg-black hover:text-[#f4f4f0] transition-colors flex items-center justify-center gap-2 disabled:opacity-30 disabled:pointer-events-none cursor-pointer mt-4"
           >
             {isRenderingDrums ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -490,6 +594,9 @@ export default function LabPage() {
           </button>
         </div>
       </div>
+
+      {/* Didactic Lab Guide */}
+      <DidacticLabGuide />
 
       {/* Lab Clips Tray */}
       <LabClipsTray />

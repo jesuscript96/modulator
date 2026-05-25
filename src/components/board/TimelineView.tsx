@@ -4,16 +4,22 @@ import type { Clip } from '../../types';
 
 interface TimelineViewProps {
   clips: Clip[];
+  bpm: number;
   playheadBeat: number;
   selectedClipId: string | null;
   onClipSelect: (id: string | null) => void;
+  onClipMove?: (clipId: string, newStartTime: number, newLane: number, deltaSemitones: number) => void;
+  onSeek?: (beat: number) => void;
 }
 
 export default function TimelineView({
   clips,
+  bpm,
   playheadBeat,
   selectedClipId,
   onClipSelect,
+  onClipMove,
+  onSeek,
 }: TimelineViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<TimelineCanvas | null>(null);
@@ -51,8 +57,16 @@ export default function TimelineView({
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.onClipSelect = onClipSelect;
+      engineRef.current.onClipMove = onClipMove;
+      engineRef.current.onSeek = onSeek;
     }
-  }, [onClipSelect, ready]);
+  }, [onClipSelect, onClipMove, onSeek, ready]);
+
+  useEffect(() => {
+    if (ready && engineRef.current) {
+      engineRef.current.setBpm(bpm);
+    }
+  }, [bpm, ready]);
 
   useEffect(() => {
     if (ready && engineRef.current) {

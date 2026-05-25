@@ -1,11 +1,18 @@
 import React, { useState, useCallback } from 'react';
 import { SpectralProcessor } from '../../engine/SpectralProcessor';
+import { extractMelodyVectors } from '../../engine/math/melodyExtractor';
+import type { SoundVector } from '../../types';
 import SpectrogramView from './SpectrogramView';
 import HelpTooltip from '../shared/HelpTooltip';
 
 interface HPSSeparatorProps {
   audioBuffer: AudioBuffer | null;
-  onSeparated?: (harmonic: AudioBuffer, percussive: AudioBuffer, melodyFreqs: number[]) => void;
+  onSeparated?: (
+    harmonic: AudioBuffer,
+    percussive: AudioBuffer,
+    melodyFreqs: number[],
+    melodyVectors: SoundVector[]
+  ) => void;
 }
 
 export default function HPSSeparator({ audioBuffer, onSeparated }: HPSSeparatorProps) {
@@ -52,7 +59,15 @@ export default function HPSSeparator({ audioBuffer, onSeparated }: HPSSeparatorP
           const pBuf = ctx.createBuffer(1, percussiveAudio.length, audioBuffer.sampleRate);
           pBuf.getChannelData(0).set(percussiveAudio);
 
-          onSeparated(hBuf, pBuf, melodyFreqs);
+          const melodyVectors = extractMelodyVectors(
+            melodyFreqs,
+            harmonic,
+            audioBuffer.sampleRate,
+            512,
+            2048
+          );
+
+          onSeparated(hBuf, pBuf, melodyFreqs, melodyVectors);
         }
 
         resolve();

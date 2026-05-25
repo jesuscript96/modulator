@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Clip, AffineMatrix } from '../../types';
 import { Transforms } from '../../engine/math/affine';
 import { X, RotateCcw, FlipHorizontal, FlipVertical, MoveHorizontal, ArrowUpDown } from 'lucide-react';

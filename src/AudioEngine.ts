@@ -5,6 +5,8 @@
  */
 import * as Tone from 'tone';
 import { euclidean as _euclidean, fibonacci as _fibonacci, noise1D as _noise1D, applyMuteRule as _applyMuteRule } from './engine/math/sequences';
+import { FractalSequencer } from './engine/FractalSequencer';
+import { PhaseVocoder } from './engine/PhaseVocoder';
 
 export const euclidean = _euclidean;
 export const fibonacci = _fibonacci;
@@ -37,6 +39,11 @@ export class AudioEngine {
     mathRule: 'none' | 'fibonacci' | 'golden' | 'noise' = 'none';
     complexity = 1;
 
+    sequencer: FractalSequencer;
+    originalBuffer: AudioBuffer | null = null;
+    stretchMode: 'none' | 'constant' | 'padovan' | 'primes' | 'paulstretch' = 'none';
+    stretchFactor = 4;
+
     patterns = {
         kick: _euclidean(0, 16),
         snare: _euclidean(0, 16),
@@ -45,6 +52,8 @@ export class AudioEngine {
     };
 
     constructor() {
+        this.sequencer = new FractalSequencer();
+
         this.filter = new Tone.Filter(2000, "lowpass");
         this.delay = new Tone.FeedbackDelay("8n", 0.2);
         this.reverb = new Tone.Freeverb({ roomSize: 0.7, dampening: 4000 });
@@ -104,14 +113,60 @@ export class AudioEngine {
         }
         this.grainPlayer = new Tone.GrainPlayer({ url, volume: 0 }).connect(this.filter);
         await Tone.loaded();
+
+        // Save original buffer for stretching
+        this.originalBuffer = this.grainPlayer.buffer.get() as AudioBuffer;
+        
+        // Apply stretch mode if one is active
+        if (this.stretchMode !== 'none') {
+            await this.applyStretch(this.stretchMode, this.stretchFactor);
+        }
+
         this.grainPlayer.loop = true;
         if (this.isPlaying) {
             this.grainPlayer.start();
         }
     }
 
+    async applyStretch(mode: 'none' | 'constant' | 'padovan' | 'primes' | 'paulstretch', factor = 4) {
+        this.stretchMode = mode;
+        this.stretchFactor = factor;
+
+        if (!this.originalBuffer || !this.grainPlayer) return;
+
+        if (mode === 'none') {
+            this.grainPlayer.buffer = new Tone.ToneAudioBuffer(this.originalBuffer);
+            return;
+        }
+
+        const inputData = this.originalBuffer.getChannelData(0);
+        const sampleRate = this.originalBuffer.sampleRate;
+        const vocoder = new PhaseVocoder(2048, factor);
+
+        let outputData: Float32Array;
+
+        if (mode === 'constant') {
+            outputData = vocoder.stretch(inputData, sampleRate);
+        } else if (mode === 'paulstretch') {
+            outputData = vocoder.paulStretch(inputData, factor);
+        } else if (mode === 'padovan') {
+            outputData = vocoder.padovanStretch(inputData, sampleRate);
+        } else if (mode === 'primes') {
+            outputData = vocoder.primeStretch(inputData, sampleRate);
+        } else {
+            outputData = inputData;
+        }
+
+        const ctx = Tone.getContext().rawContext as AudioContext;
+        const stretchedBuffer = ctx.createBuffer(1, outputData.length, sampleRate);
+        stretchedBuffer.getChannelData(0).set(outputData);
+
+        this.grainPlayer.buffer = new Tone.ToneAudioBuffer(stretchedBuffer);
+    }
+
     updateEuclidean(track: 'kick'|'snare'|'hihat'|'perc', k: number, n: number) {
         this.patterns[track] = _euclidean(k, n);
+        this.sequencer.updateEuclidean(track, k, n);
     }
 
     setPattern(track: 'kick'|'snare'|'hihat'|'perc', pattern: boolean[]) {
@@ -123,6 +178,7 @@ export class AudioEngine {
         const sixteenthDur = 60 / bpm / 4;
         const totalSteps = bars * 16;
         const duration = totalSteps * sixteenthDur + 0.5;
+        const isEuclidean = this.sequencer.currentMode === 'euclidean';
         const patterns = {
             kick: [...this.patterns.kick],
             snare: [...this.patterns.snare],
@@ -154,10 +210,22 @@ export class AudioEngine {
             for (let step = 0; step < totalSteps; step++) {
                 const s = step % 16;
                 const time = step * sixteenthDur;
-                if (patterns.kick[s]) kick.triggerAttackRelease("C1", sixteenthDur * 2, time);
-                if (patterns.snare[(s + 4) % 16]) snare.triggerAttackRelease(sixteenthDur, time);
-                if (patterns.hihat[s]) hihat.triggerAttackRelease(sixteenthDur * 0.5, time);
-                if (patterns.perc[s]) perc.triggerAttackRelease("G3", sixteenthDur, time, 0.5);
+
+                if (isEuclidean) {
+                    if (patterns.kick[s]) kick.triggerAttackRelease("C1", sixteenthDur * 2, time);
+                    if (patterns.snare[(s + 4) % 16]) snare.triggerAttackRelease(sixteenthDur, time);
+                    if (patterns.hihat[s]) hihat.triggerAttackRelease(sixteenthDur * 0.5, time);
+                    if (patterns.perc[s]) perc.triggerAttackRelease("G3", sixteenthDur, time, 0.5);
+                } else {
+                    const hits = this.sequencer.getPatternForStep(step);
+                    for (const hit of hits) {
+                        const vel = hit.velocity;
+                        if (hit.instrument === 'kick') kick.triggerAttackRelease("C1", sixteenthDur * 2, time, vel);
+                        if (hit.instrument === 'snare') snare.triggerAttackRelease(sixteenthDur, time, vel);
+                        if (hit.instrument === 'hihat') hihat.triggerAttackRelease(sixteenthDur * 0.5, time, vel);
+                        if (hit.instrument === 'perc') perc.triggerAttackRelease("G3", sixteenthDur, time, vel * 0.5);
+                    }
+                }
             }
         }, duration);
 
@@ -167,10 +235,21 @@ export class AudioEngine {
     tick(time: number) {
         const currentStep = this.step % 16;
 
-        if (this.patterns.kick[currentStep]) this.kick.triggerAttackRelease("C1", "8n", time);
-        if (this.patterns.snare[(currentStep + 4) % 16]) this.snare.triggerAttackRelease("16n", time);
-        if (this.patterns.hihat[currentStep]) this.hihat.triggerAttackRelease("32n", time);
-        if (this.patterns.perc[currentStep]) this.perc.triggerAttackRelease("G3", "16n", time, 0.5);
+        if (this.sequencer.currentMode === 'euclidean') {
+            if (this.patterns.kick[currentStep]) this.kick.triggerAttackRelease("C1", "8n", time);
+            if (this.patterns.snare[(currentStep + 4) % 16]) this.snare.triggerAttackRelease("16n", time);
+            if (this.patterns.hihat[currentStep]) this.hihat.triggerAttackRelease("32n", time);
+            if (this.patterns.perc[currentStep]) this.perc.triggerAttackRelease("G3", "16n", time, 0.5);
+        } else {
+            const hits = this.sequencer.getPatternForStep(this.step);
+            for (const hit of hits) {
+                const vel = hit.velocity;
+                if (hit.instrument === 'kick') this.kick.triggerAttackRelease("C1", "8n", time, vel);
+                if (hit.instrument === 'snare') this.snare.triggerAttackRelease("16n", time, vel);
+                if (hit.instrument === 'hihat') this.hihat.triggerAttackRelease("32n", time, vel);
+                if (hit.instrument === 'perc') this.perc.triggerAttackRelease("G3", "16n", time, vel * 0.5);
+            }
+        }
 
         let newGrainSize = 0.1;
         let newOverlap = 0.1;
@@ -246,3 +325,4 @@ export class AudioEngine {
         return this.isPlaying;
     }
 }
+

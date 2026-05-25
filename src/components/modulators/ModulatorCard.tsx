@@ -13,6 +13,7 @@ import {
 } from '../../engine/math/sequences';
 
 interface ModulatorCardProps {
+  key?: any;
   type: ModulatorType;
   active: boolean;
   currentStep: number;
@@ -158,7 +159,7 @@ export default function ModulatorCard({
   currentStep,
   complexity,
   onClick,
-}: ModulatorCardProps) {
+}: ModulatorCardProps): React.ReactElement {
   const def = MODULATOR_DEFS[type];
   const values = useMemo(() => def.generateValues(Math.max(complexity, 8)), [def, complexity]);
   const stepIdx = currentStep % Math.max(values.length, 1);
