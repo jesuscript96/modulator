@@ -62,9 +62,19 @@ export default function DidacticComposerGuide() {
       subtitle: 'La geometría de la belleza natural',
       icon: <Sparkles className="w-4 h-4 text-freq-high" />,
       musicalAnalogy: 'La sucesión de Fibonacci (1, 1, 2, 3, 5, 8, 13...) y la espiral de las conchas de mar están ligadas a la Proporción Áurea. Los humanos percibimos estas proporciones como perfectas tanto visual como acústicamente. Al aplicarlas aquí, creamos secuencias que suenan naturales, equilibradas y misteriosamente familiares.',
-      howItWorks: 'En el modo "Golden Spiral" (Paso de Tono), calculamos la distancia geométrica de una espiral que se expande hacia afuera en cada paso y la traducimos a la altura de la nota. En el modo "Fibonacci Rhythms" (Ritmo), colocamos las notas en los tiempos correspondientes a los números de la secuencia.',
-      musicalEffect: 'El modo espiral crea arpegios ascendentes y majestuosos que parecen expandirse infinitamente en el espacio. El modo ritmo crea ritmos asimétricos, síncopas y contratiempos muy interesantes que se asemejan al latido irregular pero fluido de la naturaleza.',
-      tip: 'Usa el modo "Fibonacci Rhythms" combinado con una escala "Pentatónica" para obtener bases rítmicas orgánicas y mágicas ideales para ambientar.',
+      howItWorks: 'En el modo "Golden Spiral" (Paso de Tono), calculamos la distancia geométrica de una espiral que se expande hacia afuera en cada paso y la traducimos a la altura de la nota. En el modo "Fibonacci Rhythms" (Ritmo), colocamos las notas en los tiempos correspondientes a los números de la secuencia. En el modo "Secuencia de Alturas" (Pitches), traducimos la sucesión directamente a tonos (con opción de reiniciar por octava con Módulo 12, o ir subiendo octavas de forma acumulativa).',
+      musicalEffect: 'El modo espiral crea arpegios ascendentes majestuosos. El modo ritmo genera síncopas naturales. El modo secuencia crea melodías que se expanden a saltos característicos de la naturaleza y pueden subir octavas de forma acumulativa, ideal para transiciones majestuosas.',
+      tip: 'Usa el modo "Secuencia de Alturas" con una escala "Pentatónica" y mapeo "Escala Acumulativo" con una serie personalizada como "1, 1, 2, 3, 5, 7, 12, 19". Notarás cómo la melodía sube de tonalidad fluidamente recreando la clásica ascensión divina.',
+    },
+    {
+      id: 'rhythm',
+      title: 'Modulación Rítmica y Repeticiones',
+      subtitle: 'Rompiendo la cuadrícula estática',
+      icon: <Sparkles className="w-4 h-4 text-emerald-600" />,
+      musicalAnalogy: 'En lugar de que todas las notas tengan la misma duración como el tic-tac de un reloj, la modulación rítmica inyecta una variabilidad controlada. Esto imita la forma en que los músicos interpretan frases, alargando o acortando ciertas notas de manera proporcional o aplicando repeticiones de la misma nota para anclar la melodía en el oído.',
+      howItWorks: 'Puedes activar la duración aleatoria especificando múltiplos y subdivisiones (ej: pasos de 0.25 o 0.2 de la velocidad base). Además, puedes permitir que el tono (pitch) de la nota anterior se repita ("probabilidad de repetición") y activar subdivisiones donde una nota se parte en dos mitades o en proporciones áureas (0.618 y 0.382).',
+      musicalEffect: 'Convierte secuencias de notas mecánicas y aburridas en interpretaciones orgánicas, con dinámicas y ritmos impredecibles pero coherentes. Las divisiones áureas crean micro-síncopas que fluyen de forma muy natural.',
+      tip: 'Prueba a fijar un tiempo de paso de 500 ms en modo Aleatorio con paso de 0.25, activa un 30% de probabilidad de repetición de nota y un 25% de división áurea. Tu melodía cobrará vida instantáneamente con un ritmo dinámico de jazz fractal.',
     },
   ];
 

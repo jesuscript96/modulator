@@ -72,6 +72,14 @@ export function goldenSpiral(n: number): number {
   return Math.pow(PHI, n);
 }
 
+export function getFibonacciSequence(s1: number, s2: number, steps: number): number[] {
+  const seq = [s1, s2];
+  for (let i = 2; i < steps; i++) {
+    seq.push(seq[i - 1] + seq[i - 2]);
+  }
+  return seq.slice(0, steps);
+}
+
 export function noise1D(x: number): number {
   return Math.sin(x) * Math.sin(x * 2.1) * Math.sin(x * 3.72);
 }

@@ -11,6 +11,13 @@ interface ProjectState {
   currentStep: number;
   transform: AffineMatrix | null;
   boardPlaybackMode: 'both' | 'synth' | 'audio';
+  synthType: 'triangle' | 'celestial' | 'violin' | 'guitar';
+  synthSettings: {
+    cutoff: number;
+    detune: number;
+    attack: number;
+    release: number;
+  };
 
   addClip: (clip: Clip) => void;
   removeClip: (id: string) => void;
@@ -25,6 +32,8 @@ interface ProjectState {
   setCurrentStep: (step: number) => void;
   setTransform: (transform: AffineMatrix | null) => void;
   setBoardPlaybackMode: (mode: 'both' | 'synth' | 'audio') => void;
+  setSynthType: (type: 'triangle' | 'celestial' | 'violin' | 'guitar') => void;
+  updateSynthSettings: (updates: Partial<{ cutoff: number; detune: number; attack: number; release: number }>) => void;
 }
 
 function nextAvailableLane(clips: Clip[]): number {
@@ -52,6 +61,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   currentStep: 0,
   transform: null,
   boardPlaybackMode: 'both',
+  synthType: 'triangle',
+  synthSettings: {
+    cutoff: 800,
+    detune: 12,
+    attack: 2.0,
+    release: 4.0,
+  },
 
   addClip: (clip) =>
     set((state) => ({ clips: [...state.clips, clip] })),
@@ -106,4 +122,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setCurrentStep: (step) => set({ currentStep: step }),
   setTransform: (transform) => set({ transform }),
   setBoardPlaybackMode: (boardPlaybackMode) => set({ boardPlaybackMode }),
+  setSynthType: (synthType) => set({ synthType }),
+  updateSynthSettings: (updates) =>
+    set((state) => ({
+      synthSettings: { ...state.synthSettings, ...updates },
+    })),
 }));

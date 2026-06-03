@@ -1,10 +1,17 @@
 import * as Tone from 'tone';
 import type { Clip } from '../types';
 import { useProjectStore } from '../stores/useProjectStore';
+import { CelestialPadSynth } from './CelestialPadSynth';
+import { ViolinSynth } from './ViolinSynth';
+import { GuitarSynth } from './GuitarSynth';
 
 export class BoardAudioEngine {
   private players = new Map<string, Tone.Player>();
-  private synth: Tone.PolySynth;
+  private standardSynth: Tone.PolySynth;
+  public celestialSynth: CelestialPadSynth;
+  public violinSynth: ViolinSynth;
+  public guitarSynth: GuitarSynth;
+  private synthType: 'triangle' | 'celestial' | 'violin' | 'guitar' = 'triangle';
   private scheduleIds: number[] = [];
   private filter: Tone.Filter;
   private delay: Tone.FeedbackDelay;
@@ -19,7 +26,7 @@ export class BoardAudioEngine {
     this.reverb = new Tone.Freeverb({ roomSize: 0.75, dampening: 4000 });
 
     // Additive harmonic synth: triangle wave with light chorus / space delay
-    this.synth = new Tone.PolySynth(Tone.Synth, {
+    this.standardSynth = new Tone.PolySynth(Tone.Synth, {
       oscillator: {
         type: 'triangle',
       },
@@ -32,10 +39,15 @@ export class BoardAudioEngine {
       volume: -8,
     });
 
-    this.synth.connect(this.filter);
+    this.standardSynth.connect(this.filter);
     this.filter.connect(this.delay);
     this.delay.connect(this.reverb);
     this.reverb.toDestination();
+
+    // Initialize Celestial Pad Synth
+    this.celestialSynth = new CelestialPadSynth();
+    this.violinSynth = new ViolinSynth();
+    this.guitarSynth = new GuitarSynth();
   }
 
   setPlaybackMode(mode: 'both' | 'synth' | 'audio') {
@@ -80,9 +92,12 @@ export class BoardAudioEngine {
     }
   }
 
-  sync(clips: Clip[], bpm: number, mode: 'both' | 'synth' | 'audio') {
+  sync(clips: Clip[], bpm: number, mode: 'both' | 'synth' | 'audio', synthType?: 'triangle' | 'celestial' | 'violin' | 'guitar') {
     this.clips = clips;
     this.playbackMode = mode;
+    if (synthType) {
+      this.synthType = synthType;
+    }
 
     // 1. Clear previous transport schedules
     this.scheduleIds.forEach((id) => Tone.Transport.clear(id));
@@ -123,7 +138,7 @@ export class BoardAudioEngine {
             const originalPitch = labClip.vectors[0].p;
             const currentPitch = clip.vectors[0].p;
             const semitones = currentPitch - originalPitch;
-            player.detune.value = semitones * 100;
+            (player as any).detune.value = semitones * 100;
           }
         }
 
@@ -157,7 +172,15 @@ export class BoardAudioEngine {
 
           const freq = Tone.Frequency(v.p, 'midi').toFrequency();
           const id = Tone.Transport.schedule((time) => {
-            this.synth.triggerAttackRelease(
+            let activeSynth: Tone.PolySynth | CelestialPadSynth | ViolinSynth | GuitarSynth = this.standardSynth;
+            if (this.synthType === 'celestial') {
+              activeSynth = this.celestialSynth;
+            } else if (this.synthType === 'violin') {
+              activeSynth = this.violinSynth;
+            } else if (this.synthType === 'guitar') {
+              activeSynth = this.guitarSynth;
+            }
+            activeSynth.triggerAttackRelease(
               freq,
               `${durationBeats}q`,
               time,
@@ -177,7 +200,10 @@ export class BoardAudioEngine {
   dispose() {
     this.scheduleIds.forEach((id) => Tone.Transport.clear(id));
     this.players.forEach((p) => p.dispose());
-    this.synth.dispose();
+    this.standardSynth.dispose();
+    this.celestialSynth.dispose();
+    this.violinSynth.dispose();
+    this.guitarSynth.dispose();
     this.filter.dispose();
     this.delay.dispose();
     this.reverb.dispose();

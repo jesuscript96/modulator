@@ -18,7 +18,10 @@ interface MathVisualizerProps {
   logisticR: number;
   logisticSteps: number;
   fibSteps: number;
-  fibMode: 'spiral' | 'rhythm';
+  fibMode: 'spiral' | 'rhythm' | 'sequence';
+  fibSeqType: 'standard' | 'lucas' | 'custom';
+  customFibSequenceStr: string;
+  fibPitchMode: 'wrap' | 'cumulative' | 'scaleWrap' | 'scaleCumulative';
 }
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -44,6 +47,9 @@ export default function MathVisualizer({
   logisticSteps,
   fibSteps,
   fibMode,
+  fibSeqType,
+  customFibSequenceStr,
+  fibPitchMode,
 }: MathVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -109,6 +115,9 @@ export default function MathVisualizer({
     logisticSteps,
     fibSteps,
     fibMode,
+    fibSeqType,
+    customFibSequenceStr,
+    fibPitchMode,
   ]);
 
   // ----------------------------------------------------
@@ -489,12 +498,121 @@ export default function MathVisualizer({
   };
 
   // ----------------------------------------------------
-  // FIBONACCI VISUALIZATION: Golden Spiral (Logarithmic)
+  // FIBONACCI VISUALIZATION: Golden Spiral (Logarithmic) or Golden Angle Fermat Spiral
   // ----------------------------------------------------
   const drawFibonacci = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     const padding = 20;
     const cX = width / 2;
     const cY = height / 2;
+
+    if (fibMode === 'sequence') {
+      const seqNumbers: number[] = [];
+      if (fibSeqType === 'standard') {
+        const getFib = (steps: number) => {
+          const seq = [1, 1];
+          for (let i = 2; i < steps; i++) seq.push(seq[i - 1] + seq[i - 2]);
+          return seq.slice(0, steps);
+        };
+        seqNumbers.push(...getFib(fibSteps));
+      } else if (fibSeqType === 'lucas') {
+        const getLucas = (steps: number) => {
+          const seq = [2, 1];
+          for (let i = 2; i < steps; i++) seq.push(seq[i - 1] + seq[i - 2]);
+          return seq.slice(0, steps);
+        };
+        seqNumbers.push(...getLucas(fibSteps));
+      } else {
+        const parsed = customFibSequenceStr
+          .split(',')
+          .map((s) => parseInt(s.trim()))
+          .filter((n) => !isNaN(n));
+        if (parsed.length > 0) {
+          seqNumbers.push(...parsed.slice(0, fibSteps));
+        } else {
+          const getFib = (steps: number) => {
+            const seq = [1, 1];
+            for (let i = 2; i < steps; i++) seq.push(seq[i - 1] + seq[i - 2]);
+            return seq.slice(0, steps);
+          };
+          seqNumbers.push(...getFib(fibSteps));
+        }
+      }
+
+      if (seqNumbers.length === 0) return;
+
+      const GOLDEN_ANGLE = 2.39996323; // Radians for 137.5 degrees
+      const maxVal = Math.max(...seqNumbers);
+      const logMax = Math.log(maxVal + 1) || 1;
+      const maxRadius = Math.min(width, height) / 2 - 40;
+
+      const points = seqNumbers.map((val, i) => {
+        const theta = i * GOLDEN_ANGLE;
+        const logVal = Math.log(val + 1);
+        const r = (logVal / logMax) * maxRadius;
+        
+        const x = cX + r * Math.cos(theta);
+        const y = cY + r * Math.sin(theta);
+        return { x, y, val, i };
+      });
+
+      // Draw connecting lines (geometric web)
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.25)'; // Gold web
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      points.forEach((p, idx) => {
+        if (idx === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+
+      // Draw concentric circle guidelines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      const gridLevels = [0.25, 0.5, 0.75, 1.0];
+      gridLevels.forEach((level) => {
+        ctx.beginPath();
+        ctx.arc(cX, cY, maxRadius * level, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // Draw nodes
+      points.forEach((p, idx) => {
+        const isActive = activeNoteIdx === idx;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, isActive ? 6.5 : 3.5, 0, Math.PI * 2);
+
+        if (isActive) {
+          ctx.fillStyle = '#fff';
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#fff';
+        } else {
+          const progress = idx / points.length;
+          ctx.fillStyle = `hsl(45, 100%, ${50 + progress * 20}%)`; // Gold to bright gold
+          ctx.shadowBlur = 0;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        if (isActive || idx === 0 || idx === points.length - 1 || points.length < 15) {
+          ctx.fillStyle = '#fff';
+          ctx.font = '8px JetBrains Mono';
+          ctx.textAlign = 'center';
+          ctx.fillText(p.val.toString(), p.x, p.y - 7);
+
+          if (isActive && vectors[idx]) {
+            ctx.fillStyle = '#FFD700'; // Gold note label
+            ctx.fillText(midiToNoteName(vectors[idx].p), p.x, p.y + 14);
+          }
+        }
+      });
+
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '8px JetBrains Mono';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Serie: ${fibSeqType === 'custom' ? 'Personalizada' : fibSeqType === 'lucas' ? 'Lucas' : 'Fibonacci'} | Máx: ${maxVal}`, 20, 20);
+      ctx.fillText(`Mapeo: ${fibPitchMode} (Espiral de Ángulo Áureo)`, 20, 32);
+      return;
+    }
 
     // Draw spiral path
     ctx.strokeStyle = 'rgba(255, 215, 0, 0.15)'; // Faint gold

@@ -21,7 +21,7 @@ export function interpretTurtleMelody(
   sequence: string,
   basePitch = 60,
   stepSize = 2, // semitones (e.g. 2 for major seconds)
-  noteDurationMs = 250, // sixteenth note at 120 bpm
+  noteDurationMs: number | number[] = 250, // sixteenth note at 120 bpm or sequence of durations
   sourceId = 'lsystem-turtle'
 ): SoundVector[] {
   const vectors: SoundVector[] = [];
@@ -30,22 +30,29 @@ export function interpretTurtleMelody(
   const state: TurtleState = {
     pitch: basePitch,
     time: 0,
-    duration: noteDurationMs,
+    duration: Array.isArray(noteDurationMs) ? noteDurationMs[0] : noteDurationMs,
   };
+
+  let noteIndex = 0;
 
   for (let i = 0; i < sequence.length; i++) {
     const char = sequence[i];
 
     if (char === 'F' || char === 'A' || char === 'B') {
+      const currentDuration = Array.isArray(noteDurationMs)
+        ? noteDurationMs[noteIndex % noteDurationMs.length]
+        : noteDurationMs;
+
       vectors.push({
         id: `turtle-${i}-${Math.random().toString(36).slice(2, 6)}`,
         t: state.time,
         p: state.pitch,
-        duration: state.duration,
+        duration: currentDuration,
         velocity: 0.8,
         sourceId,
       });
-      state.time += state.duration;
+      state.time += currentDuration;
+      noteIndex++;
     } else if (char === '+') {
       state.pitch = Math.max(12, Math.min(127, state.pitch + stepSize));
     } else if (char === '-') {

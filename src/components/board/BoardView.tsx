@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { applyToAll } from '../../engine/math/affine';
-import type { AffineMatrix } from '../../types';
+import type { AffineMatrix, Clip } from '../../types';
 import TimelineView from './TimelineView';
 import ClipInspector from './ClipInspector';
 import HelpTooltip from '../shared/HelpTooltip';
@@ -19,9 +19,11 @@ export default function BoardView({ boardEngine }: BoardViewProps) {
   const isPlaying = useProjectStore((s) => s.isPlaying);
   const bpm = useProjectStore((s) => s.bpm);
   const boardPlaybackMode = useProjectStore((s) => s.boardPlaybackMode);
+  const synthType = useProjectStore((s) => s.synthType);
   const selectClip = useProjectStore((s) => s.selectClip);
   const updateClip = useProjectStore((s) => s.updateClip);
   const setBoardPlaybackMode = useProjectStore((s) => s.setBoardPlaybackMode);
+  const setSynthType = useProjectStore((s) => s.setSynthType);
 
   const selectedClip = clips.find((c) => c.id === selectedClipId) ?? null;
   const playheadBeat = (currentStep / 4);
@@ -92,6 +94,19 @@ export default function BoardView({ boardEngine }: BoardViewProps) {
               <option value="both">Both (Audio + Synth)</option>
               <option value="synth">Synth Notes Only</option>
               <option value="audio">Audio Wave Only</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5 border-l border-black/10 pl-4">
+            <span className="text-[9px] uppercase tracking-wider text-black/50">Synth Engine:</span>
+            <select
+              className="bg-transparent border border-black/20 px-2 py-0.5 font-mono text-[9px] uppercase outline-none focus:border-black cursor-pointer"
+              value={synthType}
+              onChange={(e) => setSynthType(e.target.value as any)}
+            >
+              <option value="triangle">Triangle</option>
+              <option value="celestial">Celestial Pad</option>
+              <option value="violin">Violin</option>
+              <option value="guitar">Guitar</option>
             </select>
           </div>
           <span className="text-[10px] font-mono text-black/40 border-l border-black/10 pl-4">

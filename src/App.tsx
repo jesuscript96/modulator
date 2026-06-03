@@ -15,16 +15,36 @@ export default function App() {
   const clips = useProjectStore((s) => s.clips);
   const bpm = useProjectStore((s) => s.bpm);
   const boardPlaybackMode = useProjectStore((s) => s.boardPlaybackMode);
+  const synthType = useProjectStore((s) => s.synthType);
+  const synthSettings = useProjectStore((s) => s.synthSettings);
 
   const setPlaying = useProjectStore((s) => s.setPlaying);
   const setCurrentStep = useProjectStore((s) => s.setCurrentStep);
 
   const boardEngine = useMemo(() => new BoardAudioEngine(), []);
 
-  // Sync board engine with clips and BPM
+  // Sync board engine with clips, BPM, synth engine, and settings
   useEffect(() => {
-    boardEngine.sync(clips, bpm, boardPlaybackMode);
-  }, [clips, bpm, boardPlaybackMode, boardEngine]);
+    boardEngine.sync(clips, bpm, boardPlaybackMode, synthType);
+    if (synthSettings) {
+      if (synthType === 'celestial' && boardEngine.celestialSynth) {
+        boardEngine.celestialSynth.setBrightness(synthSettings.cutoff);
+        boardEngine.celestialSynth.setDetune(synthSettings.detune);
+        boardEngine.celestialSynth.setAttack(synthSettings.attack);
+        boardEngine.celestialSynth.setRelease(synthSettings.release);
+      } else if (synthType === 'violin' && boardEngine.violinSynth) {
+        boardEngine.violinSynth.setBrightness(synthSettings.cutoff);
+        boardEngine.violinSynth.setDetune(synthSettings.detune);
+        boardEngine.violinSynth.setAttack(synthSettings.attack);
+        boardEngine.violinSynth.setRelease(synthSettings.release);
+      } else if (synthType === 'guitar' && boardEngine.guitarSynth) {
+        boardEngine.guitarSynth.setBrightness(synthSettings.cutoff);
+        boardEngine.guitarSynth.setDetune(synthSettings.detune);
+        boardEngine.guitarSynth.setAttack(synthSettings.attack);
+        boardEngine.guitarSynth.setRelease(synthSettings.release);
+      }
+    }
+  }, [clips, bpm, boardPlaybackMode, synthType, synthSettings, boardEngine]);
 
   useEffect(() => {
     return () => {
