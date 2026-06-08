@@ -68,7 +68,7 @@ export async function renderToWav(
   return audioBufferToWav(renderedBuffer);
 }
 
-function audioBufferToWav(buffer: AudioBuffer): Blob {
+export function audioBufferToWav(buffer: AudioBuffer): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const bitsPerSample = 16;

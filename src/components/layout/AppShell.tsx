@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TransportBar from './TransportBar';
+import ProjectManager from '../project/ProjectManager';
 import { useProjectStore } from '../../stores/useProjectStore';
 
 interface AppShellProps {
@@ -18,6 +19,7 @@ export default function AppShell({
   onTogglePlay,
 }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
   const bpm = useProjectStore((s) => s.bpm);
   const setBpm = useProjectStore((s) => s.setBpm);
 
@@ -28,6 +30,7 @@ export default function AppShell({
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onOpenProjects={() => setShowProjects(true)}
         />
         <main className="flex-grow flex flex-col min-w-0 min-h-0 overflow-auto">
           <Outlet />
@@ -43,6 +46,11 @@ export default function AppShell({
         onTogglePlay={onTogglePlay}
         onBpmChange={setBpm}
       />
+
+      {/* Project Manager Modal */}
+      {showProjects && (
+        <ProjectManager onClose={() => setShowProjects(false)} />
+      )}
     </div>
   );
 }

@@ -1,20 +1,23 @@
 import { NavLink } from 'react-router-dom';
-import { FlaskConical, LayoutGrid, Library, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Home, Music, LayoutGrid, Library, ChevronLeft, ChevronRight, Sparkles, Cpu, FolderOpen } from 'lucide-react';
 import { useProjectStore } from '../../stores/useProjectStore';
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  onOpenProjects: () => void;
 }
 
 const navItems = [
-  { to: '/lab', icon: FlaskConical, label: 'Lab' },
+  { to: '/home', icon: Home, label: 'Home' },
+  { to: '/drums', icon: Music, label: 'Drums' },
   { to: '/composer', icon: Sparkles, label: 'Composer' },
   { to: '/board', icon: LayoutGrid, label: 'Board' },
+  { to: '/modular', icon: Cpu, label: 'Modular' },
   { to: '/library', icon: Library, label: 'Library' },
 ];
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, onOpenProjects }: SidebarProps) {
   const clips = useProjectStore((s) => s.clips);
   const labClips = useProjectStore((s) => s.labClips);
   const sendToBoard = useProjectStore((s) => s.sendToBoard);
@@ -53,6 +56,15 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}
+
+        {/* Action: Open Projects Manager */}
+        <button
+          onClick={onOpenProjects}
+          className="flex items-center gap-2.5 px-2.5 py-2 text-xs uppercase tracking-widest text-black/50 hover:text-black hover:bg-black/5 transition-colors w-full text-left font-mono cursor-pointer"
+        >
+          <FolderOpen className="w-4 h-4 shrink-0 text-emerald-600" />
+          {!collapsed && <span className="font-sans">Projects</span>}
+        </button>
       </nav>
 
       {/* Lab clips (staging) */}

@@ -88,3 +88,31 @@ export interface LabClip {
   createdAt: number;
   vectors?: SoundVector[];
 }
+
+export interface ModularJack {
+  id: string; // e.g. "module-123-input-cutoff"
+  moduleId: string;
+  label: string;
+  type: 'in' | 'out';
+  paramName?: string; // which parameter it modulates / outputs
+}
+
+export interface ModularModule {
+  id: string;
+  type: 'modulator' | 'synth' | 'filter' | 'scope' | 'script';
+  name: string;
+  x: number;
+  y: number;
+  params: Record<string, number>;
+  inputs: ModularJack[];
+  outputs: ModularJack[];
+  scriptCode?: string; // For custom scripting module
+}
+
+export interface ModularCable {
+  id: string;
+  fromPortId: string;
+  toPortId: string;
+  color: string;
+}
+

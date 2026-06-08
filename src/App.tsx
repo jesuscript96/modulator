@@ -2,10 +2,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useCallback, useMemo } from 'react';
 import * as Tone from 'tone';
 import AppShell from './components/layout/AppShell';
-import LabPage from './pages/LabPage';
+import HomePage from './pages/HomePage';
 import BoardPage from './pages/BoardPage';
 import LibraryPage from './pages/LibraryPage';
 import ComposerPage from './pages/ComposerPage';
+import ModularPage from './pages/ModularPage';
+import DrumsPage from './pages/DrumsPage';
 import { useProjectStore } from './stores/useProjectStore';
 import { BoardAudioEngine } from './engine/BoardAudioEngine';
 
@@ -89,9 +91,11 @@ export default function App() {
             />
           }
         >
-          <Route index element={<Navigate to="/lab" replace />} />
-          <Route path="/lab" element={<LabPage />} />
+          <Route index element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/drums" element={<DrumsPage />} />
           <Route path="/board" element={<BoardPage boardEngine={boardEngine} />} />
+          <Route path="/modular" element={<ModularPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/composer" element={<ComposerPage />} />
         </Route>
